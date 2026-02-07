@@ -4,9 +4,8 @@ import { AppState, CategoryId, DayLog, Expense, Category, MoodConfig, JournalEnt
 import HourlyGrid from '../components/HourlyGrid';
 import CategoryPicker from '../components/CategoryPicker';
 import CustomSelect from '../components/CustomSelect';
-import { Plus, Trash2, Calendar, Pencil, Save, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ListTodo, Circle, CheckCircle2, Trophy, ArrowRight, Image as ImageIcon, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Calendar, Pencil, Save, X, Clock, ChevronDown, ChevronUp, ListTodo, Circle, CheckCircle2, Trophy, ArrowRight, Image as ImageIcon, GripVertical } from 'lucide-react';
 import { playPopSound, playSuccessSound, processImage } from '../constants';
-import { addDays } from 'date-fns';
 
 // --- Button Time Picker Component ---
 interface TimeColumnProps {
@@ -41,7 +40,6 @@ const TimeColumn: React.FC<TimeColumnProps> = ({ value, onIncrement, onDecrement
 };
 
 const GoogleStyleTimePicker: React.FC<{ value: string, onChange: (val: string) => void, onClose: () => void }> = ({ value, onChange, onClose }) => {
-  // Parse initial value or default to 12:00 PM
   const parseTime = (t: string) => {
     if (!t) return { h: 12, m: 0, p: 'PM' };
     let [hours, minutes] = t.split(':');
@@ -99,46 +97,19 @@ const GoogleStyleTimePicker: React.FC<{ value: string, onChange: (val: string) =
   return (
     <div className="absolute top-full mt-2 left-0 bg-[#18181b] border border-white/10 rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.9)] z-50 w-auto min-w-[240px] animate-in slide-in-from-top-2 zoom-in-95 ring-1 ring-white/5">
       <div className="flex justify-center gap-4 items-center mb-6">
-        <TimeColumn 
-          value={current.h.toString()} 
-          onIncrement={incHour} 
-          onDecrement={decHour} 
-          label="Hour"
-        />
+        <TimeColumn value={current.h.toString()} onIncrement={incHour} onDecrement={decHour} label="Hour" />
         <span className="text-gray-600 font-bold text-xl pb-4">:</span>
-        <TimeColumn 
-          value={current.m.toString().padStart(2, '0')} 
-          onIncrement={incMin} 
-          onDecrement={decMin} 
-          label="Min" 
-        />
+        <TimeColumn value={current.m.toString().padStart(2, '0')} onIncrement={incMin} onDecrement={decMin} label="Min" />
         <div className="w-px h-16 bg-white/5 mx-2" />
         <div className="flex flex-col items-center gap-2">
-            <button 
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPopSound(); togglePeriod(); }}
-                className="p-1 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-                <ChevronUp size={20} />
-            </button>
-            <div className="w-16 h-10 bg-pastel-mint/10 border border-pastel-mint/20 rounded-xl flex items-center justify-center text-sm font-bold text-pastel-mint cursor-pointer" onClick={togglePeriod}>
-                {current.p}
-            </div>
-             <button 
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPopSound(); togglePeriod(); }}
-                className="p-1 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-            >
-                <ChevronDown size={20} />
-            </button>
+            <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPopSound(); togglePeriod(); }} className="p-1 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"><ChevronUp size={20} /></button>
+            <div className="w-16 h-10 bg-pastel-mint/10 border border-pastel-mint/20 rounded-xl flex items-center justify-center text-sm font-bold text-pastel-mint cursor-pointer" onClick={togglePeriod}>{current.p}</div>
+             <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPopSound(); togglePeriod(); }} className="p-1 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"><ChevronDown size={20} /></button>
             <span className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">AM/PM</span>
         </div>
       </div>
       <div className="flex justify-between items-center">
-          <button 
-            onClick={() => { onChange(''); onClose(); }}
-            className="text-xs text-red-400 hover:text-red-300 font-bold uppercase tracking-wider px-2"
-          >
-            Clear Time
-          </button>
+          <button onClick={() => { onChange(''); onClose(); }} className="text-xs text-red-400 hover:text-red-300 font-bold uppercase tracking-wider px-2">Clear Time</button>
           <button onClick={onClose} className="text-xs bg-white text-black font-bold uppercase tracking-wider px-6 py-2 rounded-lg hover:bg-pastel-mint transition-colors shadow-lg">Done</button>
       </div>
     </div>
@@ -186,12 +157,28 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
   const [showCelebration, setShowCelebration] = useState(false);
   const timePickerRef = useRef<HTMLDivElement>(null);
 
-  // Drag and Drop
-  const dragItem = useRef<number | null>(null);
-  const dragOverItem = useRef<number | null>(null);
-
+  // Custom DnD
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null); // Index of original item
+  const [dropTargetIdx, setDropTargetIdx] = useState<number | null>(null); // Index where we will drop
+  const [floatingPos, setFloatingPos] = useState({ x: 0, y: 0 });
+  const [floatingOffset, setFloatingOffset] = useState({ x: 0, y: 0 });
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isDraggingRef = useRef(false);
+  const itemsRef = useRef<(HTMLDivElement | null)[]>([]);
+  
   const dateInputRef = useRef<HTMLInputElement>(null);
   const selectedDate = searchParams.get('date') || new Date().toISOString().split('T')[0];
+
+  const currentLog = state.logs[selectedDate] || {
+    date: selectedDate,
+    hours: {},
+    expenses: [],
+    moods: [],
+    journalEntries: [],
+    tasks: []
+  };
+
+  const tasks = currentLog.tasks || [];
 
   const COLORS = [
     'bg-pastel-pink', 'bg-pastel-rose', 'bg-pastel-purple', 'bg-pastel-blue',
@@ -207,15 +194,6 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const currentLog = state.logs[selectedDate] || {
-    date: selectedDate,
-    hours: {},
-    expenses: [],
-    moods: [],
-    journalEntries: [],
-    tasks: []
-  };
 
   const handleDateChange = (newDate: string) => {
     setSearchParams({ date: newDate });
@@ -256,23 +234,26 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
   };
 
   const handleHourChange = (hour: number, catId: CategoryId) => {
-    const rawData = currentLog.hours[hour];
-    // Handle both old format (string) and new format (array) for backward compatibility
-    const currentActivities = Array.isArray(rawData) ? rawData : (rawData ? [rawData] : []);
-    // Add the activity if not already present
-    const newActivities = currentActivities.includes(catId) ? currentActivities : [...currentActivities, catId];
-    const newHours = { ...currentLog.hours, [hour]: newActivities };
-    updateLog(selectedDate, { ...currentLog, hours: newHours });
+    const prevHours = currentLog.hours || {};
+    const raw = prevHours[hour];
+    const existing: CategoryId[] = Array.isArray(raw) ? raw.slice() : (raw ? [raw] : []);
+    if (!existing.includes(catId)) {
+      const newHours = { ...prevHours, [hour]: [...existing, catId] };
+      updateLog(selectedDate, { ...currentLog, hours: newHours });
+    }
   };
 
-  const handleRemoveActivity = (hour: number, catId: CategoryId) => {
-    const rawData = currentLog.hours[hour];
-    // Handle both old format (string) and new format (array) for backward compatibility
-    const currentActivities = Array.isArray(rawData) ? rawData : (rawData ? [rawData] : []);
-    const newActivities = currentActivities.filter(id => id !== catId);
-    const newHours = newActivities.length === 0 
-      ? (() => { const { [hour]: _, ...rest } = { ...currentLog.hours }; return rest; })()
-      : { ...currentLog.hours, [hour]: newActivities };
+  const handleHourRemove = (hour: number, catId: CategoryId) => {
+    const prevHours = currentLog.hours || {};
+    const raw = prevHours[hour];
+    const existing: CategoryId[] = Array.isArray(raw) ? raw.slice() : (raw ? [raw] : []);
+    const filtered = existing.filter(id => id !== catId);
+    const newHours = { ...prevHours };
+    if (filtered.length === 0) {
+      delete newHours[hour];
+    } else {
+      newHours[hour] = filtered;
+    }
     updateLog(selectedDate, { ...currentLog, hours: newHours });
   };
 
@@ -377,8 +358,7 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
       time: newTaskTime,
       completed: false
     };
-    // Disabled automatic sorting to allow manual reordering
-    const updatedTasks = [...(currentLog.tasks || []), task];
+    const updatedTasks = [...tasks, task];
     
     updateLog(selectedDate, { ...currentLog, tasks: updatedTasks });
     setNewTaskTitle('');
@@ -386,17 +366,15 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
 
   const toggleTask = (taskId: string) => {
     playPopSound();
-    const updatedTasks = currentLog.tasks.map(t => 
+    const updatedTasks = tasks.map(t => 
       t.id === taskId ? { ...t, completed: !t.completed } : t
     );
     updateLog(selectedDate, { ...currentLog, tasks: updatedTasks });
 
-    // Check if all tasks WITH time assigned are completed
-    const tasksWithTime = updatedTasks.filter(t => t.time);
-    const allTimedTasksCompleted = tasksWithTime.length > 0 && tasksWithTime.every(t => t.completed);
+    const allCompleted = updatedTasks.length > 0 && updatedTasks.every(t => t.completed);
     const justCompleted = updatedTasks.find(t => t.id === taskId)?.completed;
     
-    if (allTimedTasksCompleted && justCompleted) {
+    if (allCompleted && justCompleted) {
         setTimeout(() => {
             setShowCelebration(true);
             playSuccessSound();
@@ -404,45 +382,98 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
     }
   };
 
-  // Drag and Drop Handlers
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, position: number) => {
-    dragItem.current = position;
-    // Optional: Add a subtle ghost effect or class if needed, but browser default is usually fine
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>, position: number) => {
-    e.preventDefault();
-    if (dragItem.current === null || dragItem.current === position) return;
-
-    const newTasks = [...(currentLog.tasks || [])];
-    const draggedItemContent = newTasks[dragItem.current];
-    
-    // Remove the item
-    newTasks.splice(dragItem.current, 1);
-    // Insert at new position
-    newTasks.splice(position, 0, draggedItemContent);
-
-    // Update ref to track the new position of the dragged item
-    dragItem.current = position;
-
-    // Update state to reflect the move visually (live sorting)
-    updateLog(selectedDate, { ...currentLog, tasks: newTasks });
-  };
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    // Necessary to allow dropping
-    e.preventDefault(); 
-  };
-
-  const handleDragEnd = () => {
-    dragItem.current = null;
-    dragOverItem.current = null;
-  };
-
   const deleteTask = (taskId: string) => {
-    const updatedTasks = currentLog.tasks.filter(t => t.id !== taskId);
+    const updatedTasks = tasks.filter(t => t.id !== taskId);
     updateLog(selectedDate, { ...currentLog, tasks: updatedTasks });
+  };
+
+  // --- Drag and Drop Logic with Floating Card & Drop Indicator ---
+  
+  const handlePointerDown = (e: React.PointerEvent, index: number) => {
+    if (!e.isPrimary) return;
+    if ((e.target as HTMLElement).closest('button, input')) return;
+
+    const element = e.currentTarget as HTMLElement;
+    const rect = element.getBoundingClientRect();
+    
+    // Store offset so card doesn't jump to cursor center
+    setFloatingOffset({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+
+    isDraggingRef.current = false;
+
+    // Wait for long press to start drag
+    longPressTimer.current = setTimeout(() => {
+        isDraggingRef.current = true;
+        setDraggingIdx(index);
+        setDropTargetIdx(index);
+        setFloatingPos({ x: e.clientX, y: e.clientY });
+        element.setPointerCapture(e.pointerId);
+        if (navigator.vibrate) navigator.vibrate(50);
+    }, 200);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDraggingRef.current || draggingIdx === null) return;
+    e.preventDefault();
+
+    setFloatingPos({ x: e.clientX, y: e.clientY });
+
+    // Calculate insertion index based on hover position
+    // We check all item refs to see which one we are intersecting
+    let newDropIndex = tasks.length; // Default to end
+
+    for (let i = 0; i < tasks.length; i++) {
+        const el = itemsRef.current[i];
+        if (el) {
+            const rect = el.getBoundingClientRect();
+            // If overlapping vertically
+            if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                // If in top half, drop before. Bottom half, drop after.
+                if (e.clientY < rect.top + rect.height / 2) {
+                    newDropIndex = i;
+                } else {
+                    newDropIndex = i + 1;
+                }
+                break;
+            }
+        }
+    }
+    
+    // Clamp
+    if (newDropIndex < 0) newDropIndex = 0;
+    if (newDropIndex > tasks.length) newDropIndex = tasks.length;
+
+    setDropTargetIdx(newDropIndex);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    
+    if (isDraggingRef.current && draggingIdx !== null && dropTargetIdx !== null) {
+        const element = e.currentTarget as HTMLElement;
+        if (element.hasPointerCapture(e.pointerId)) {
+            element.releasePointerCapture(e.pointerId);
+        }
+
+        // Reorder Logic
+        if (draggingIdx !== dropTargetIdx && draggingIdx !== dropTargetIdx - 1) { // -1 check bcs if we drop after itself, index is +1 but pos is same
+            const newTasks = [...tasks];
+            const [item] = newTasks.splice(draggingIdx, 1);
+            // Adjust drop index if we removed an item from before it
+            let actualDropIdx = dropTargetIdx;
+            if (draggingIdx < dropTargetIdx) actualDropIdx -= 1;
+            
+            newTasks.splice(actualDropIdx, 0, item);
+            updateLog(selectedDate, { ...currentLog, tasks: newTasks });
+        }
+    }
+
+    setDraggingIdx(null);
+    setDropTargetIdx(null);
+    isDraggingRef.current = false;
   };
 
   const formatTime = (time: string) => {
@@ -479,7 +510,25 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
         </div>
       )}
 
-      {/* Mood Creation Modal */}
+      {/* Floating Card Portal */}
+      {draggingIdx !== null && (
+        <div 
+            className="fixed z-[100] pointer-events-none bg-dark-card/90 backdrop-blur border border-white/20 p-3 rounded-xl flex items-center gap-3 shadow-2xl w-[90%] max-w-[300px] left-0 top-0"
+            style={{ 
+                transform: `translate(${floatingPos.x - floatingOffset.x}px, ${floatingPos.y - floatingOffset.y}px) rotate(2deg)`,
+                width: itemsRef.current[draggingIdx]?.clientWidth
+            }}
+        >
+             <div className="text-pastel-mint scale-110"><Circle size={20} /></div>
+             <div className="flex-grow flex flex-col">
+               <span className="text-sm font-medium opacity-90">{tasks[draggingIdx].title}</span>
+               {tasks[draggingIdx].time && <span className="text-[10px] text-pastel-mint font-black tracking-widest">{formatTime(tasks[draggingIdx].time)}</span>}
+             </div>
+             <div className="p-2 text-white"><GripVertical size={16} /></div>
+        </div>
+      )}
+
+      {/* Modals */}
       {showMoodForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-dark-card border border-white/10 p-6 rounded-[2.5rem] shadow-2xl w-full max-w-sm relative">
@@ -508,7 +557,6 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
         </div>
       )}
 
-      {/* Category Creation Modal */}
       {showCategoryForm && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
            <div className="bg-dark-card border border-white/10 p-6 rounded-[2.5rem] shadow-2xl w-full max-w-sm relative">
@@ -542,41 +590,19 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
 
       <header className="text-center space-y-2">
         <h1 className="text-4xl font-bold tracking-tighter">Daily Log</h1>
-        <div className="flex items-center justify-center gap-4">
-          <button
-            onClick={() => {
-              const prevDate = addDays(new Date(selectedDate), -1).toISOString().split('T')[0];
-              handleDateChange(prevDate);
-            }}
-            className="p-2 rounded-lg hover:bg-white/10 text-pastel-mint transition-colors"
-            title="Previous day"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <div 
-            onClick={() => dateInputRef.current?.showPicker()}
-            className="inline-flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/10 px-4 py-1.5 rounded-full border border-white/5 transition-all group"
-          >
-            <Calendar size={14} className="text-theme-accent" />
-            <span className="opacity-60 text-sm">Currently viewing: <span className="opacity-100 font-medium">{formattedDisplayDate}</span></span>
-            <input 
-              ref={dateInputRef}
-              type="date" 
-              value={selectedDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="absolute opacity-0 w-0 h-0 pointer-events-none"
-            />
-          </div>
-          <button
-            onClick={() => {
-              const nextDate = addDays(new Date(selectedDate), 1).toISOString().split('T')[0];
-              handleDateChange(nextDate);
-            }}
-            className="p-2 rounded-lg hover:bg-white/10 text-pastel-mint transition-colors"
-            title="Next day"
-          >
-            <ChevronRight size={18} />
-          </button>
+        <div 
+          onClick={() => dateInputRef.current?.showPicker()}
+          className="inline-flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/10 px-4 py-1.5 rounded-full border border-white/5 transition-all group"
+        >
+          <Calendar size={14} className="text-theme-accent" />
+          <span className="opacity-60 text-sm">Currently viewing: <span className="opacity-100 font-medium">{formattedDisplayDate}</span></span>
+          <input 
+            ref={dateInputRef}
+            type="date" 
+            value={selectedDate}
+            onChange={(e) => handleDateChange(e.target.value)}
+            className="absolute opacity-0 w-0 h-0 pointer-events-none"
+          />
         </div>
       </header>
 
@@ -586,6 +612,7 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
           <div className="p-2 bg-pastel-mint/10 rounded-xl text-pastel-mint font-bold"><ListTodo size={18} /></div>
           <div>
             <h3 className="text-lg font-medium opacity-90">Daily Agenda</h3>
+            <p className="text-[10px] opacity-50 uppercase tracking-widest font-black">Plan your day ahead</p>
           </div>
         </div>
 
@@ -634,39 +661,57 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
           </button>
         </div>
 
-        <div className="space-y-2">
-          {(!currentLog.tasks || currentLog.tasks.length === 0) && (
+        <div className="space-y-2 relative" onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerLeave={handlePointerUp}>
+          {(!tasks || tasks.length === 0) && (
              <div className="text-center opacity-60 py-6 italic text-xs font-light bg-black/20 rounded-2xl border border-white/5 border-dashed">
                 No tasks planned yet. <br/> Start by adding a task above!
              </div>
           )}
-          {currentLog.tasks?.map((task, index) => (
-            <div 
-              key={task.id} 
-              draggable
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragEnter={(e) => handleDragEnter(e, index)}
-              onDragOver={handleDragOver}
-              onDragEnd={handleDragEnd}
-              className="group flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-all cursor-move active:cursor-grabbing active:opacity-50 animate-in slide-in-from-bottom-2"
-            >
-               <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleTask(task.id); }} className={`cursor-pointer transition-all duration-300 ${task.completed ? 'text-pastel-mint scale-110' : 'text-gray-600 hover:text-white'}`}>
-                  {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-               </button>
-               <div className={`flex-grow flex flex-col ${task.completed ? 'opacity-40 transition-opacity duration-300' : ''}`}>
-                 <span className={`text-sm font-medium ${task.completed ? 'line-through opacity-50' : 'opacity-90'}`}>{task.title}</span>
-                 {task.time && <span className="text-[10px] text-pastel-mint font-black tracking-widest">{formatTime(task.time)}</span>}
-               </div>
-               
-               <div className="opacity-0 group-hover:opacity-100 transition-opacity mr-2 text-gray-600">
-                  <GripVertical size={16} />
-               </div>
+          
+          {tasks.map((task, index) => {
+            const isDragging = draggingIdx === index;
+            const isDropTarget = dropTargetIdx === index;
+            
+            return (
+              <React.Fragment key={task.id}>
+                  {/* Drop Indicator Line (Before) */}
+                  {isDropTarget && dropTargetIdx === index && draggingIdx !== index && (
+                      <div className="h-1 bg-pastel-mint rounded-full my-1 animate-in zoom-in duration-200" />
+                  )}
 
-               <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteTask(task.id); }} className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-2 cursor-pointer">
-                 <Trash2 size={16} />
-               </button>
-            </div>
-          ))}
+                  <div 
+                    ref={el => { itemsRef.current[index] = el; }}
+                    onPointerDown={(e) => handlePointerDown(e, index)}
+                    className={`
+                        flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 hover:border-white/10 transition-all select-none touch-pan-y
+                        ${isDragging ? 'opacity-20' : 'animate-in slide-in-from-bottom-2'}
+                    `}
+                  >
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleTask(task.id); }} className={`cursor-pointer transition-all duration-300 ${task.completed ? 'text-pastel-mint scale-110' : 'text-gray-600 hover:text-white'}`}>
+                        {task.completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                    </button>
+                    <div className={`flex-grow flex flex-col ${task.completed ? 'opacity-40 transition-opacity duration-300' : ''}`}>
+                    <span className={`text-sm font-medium ${task.completed ? 'line-through opacity-50' : 'opacity-90'}`}>{task.title}</span>
+                    {task.time && <span className="text-[10px] text-pastel-mint font-black tracking-widest">{formatTime(task.time)}</span>}
+                    </div>
+                    
+                    {/* Grip Handle */}
+                    <div className="p-2 text-gray-600 opacity-20 hover:opacity-50 cursor-grab active:cursor-grabbing">
+                        <GripVertical size={16} />
+                    </div>
+    
+                    <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteTask(task.id); }} className="text-gray-600 hover:text-red-400 opacity-0 hover:opacity-100 transition-opacity p-2 cursor-pointer">
+                    <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  {/* Drop Indicator Line (End of list special case) */}
+                  {dropTargetIdx === tasks.length && index === tasks.length - 1 && draggingIdx !== index && (
+                      <div className="h-1 bg-pastel-mint rounded-full my-1 animate-in zoom-in duration-200" />
+                  )}
+              </React.Fragment>
+            );
+          })}
         </div>
       </section>
 
@@ -716,6 +761,7 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
       <section className="bg-dark-card p-8 rounded-[2.5rem] border border-white/5 shadow-xl space-y-6">
         <div className="flex justify-between items-center px-2">
           <h3 className="text-lg font-medium opacity-90">Activity Grid</h3>
+          <span className="text-[10px] opacity-60 uppercase tracking-widest font-black">Paint your rhythm</span>
         </div>
         <CategoryPicker 
           categories={state.categories} 
@@ -723,7 +769,13 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
           onSelect={setActiveCategory}
           onAddInline={() => setShowCategoryForm(true)}
         />
-        <HourlyGrid categories={state.categories} hours={currentLog.hours} onChange={handleHourChange} onRemove={handleRemoveActivity} selectedCategory={activeCategory} />
+        <HourlyGrid 
+          categories={state.categories} 
+          hours={currentLog.hours} 
+          onChange={handleHourChange} 
+          onRemove={handleHourRemove}
+          selectedCategory={activeCategory} 
+        />
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -76,7 +76,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
              </span>
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Lumina</h1>
-          <p className="text-gray-500 font-light italic">Your personal time sanctuary.</p>
+          <p className="text-gray-500 font-light italic">Your life in numbers.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -159,7 +159,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           >
             {loading ? <Loader2 className="animate-spin" size={20} /> : (
               <>
-                {isNew ? 'Create Secure Account' : 'Enter Sanctuary'}
+                {isNew ? 'Create Secure Account' : 'Continue'}
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </>
             )}
