@@ -1,0 +1,39 @@
+name: Build and Deploy to Main
+
+on:
+  push:
+    branches:
+      - dev # 1. Triggers whenever you push to the 'dev' branch
+
+permissions:
+  contents: write # 2. Gives the action permission to write to your 'main' branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step A: Checkout the code from 'dev'
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Step B: Install Node.js
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24 # Or the version you use
+
+      # Step C: Install dependencies and Build
+      - name: Install and Build
+        run: |
+          npm ci
+          npm run build
+          cp README.md dist/README.md || true 
+
+      # Step D: Deploy the 'dist' folder to 'main' branch
+      - name: Deploy to Main Branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: dist # The folder containing the files you want on 'main'
+          branch: main # The target branch
+          clean: true  # This removes old files from 'main' so it matches 'dist' exactly
