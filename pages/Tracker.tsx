@@ -4,8 +4,87 @@ import { AppState, CategoryId, DayLog, Expense, Category, MoodConfig, JournalEnt
 import HourlyGrid from '../components/HourlyGrid';
 import CategoryPicker from '../components/CategoryPicker';
 import CustomSelect from '../components/CustomSelect';
-import { Plus, Trash2, Calendar, Pencil, Save, X, Clock, ChevronDown, ChevronUp, ListTodo, Circle, CheckCircle2, Trophy, ArrowRight, Image as ImageIcon, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Calendar, Pencil, Save, X, Clock, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ListTodo, Circle, CheckCircle2, Trophy, ArrowRight, Image as ImageIcon, GripVertical } from 'lucide-react';
 import { playPopSound, playSuccessSound, processImage } from '../constants';
+import { addDays, format, endOfMonth, endOfWeek, eachDayOfInterval, isSameMonth, isToday, addMonths } from 'date-fns';
+
+// Helper functions for missing date-fns exports
+const startOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
+
+const startOfWeek = (date: Date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day;
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const subMonths = (date: Date, amount: number) => {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() - amount);
+  return d;
+};
+
+// --- Mini Calendar Component ---
+const MiniCalendar: React.FC<{ value: string; onChange: (date: string) => void; onClose: () => void }> = ({ value, onChange, onClose }) => {
+  const [viewDate, setViewDate] = useState(new Date(value));
+  const selectedDate = new Date(value);
+
+  const monthStart = startOfMonth(viewDate);
+  const monthEnd = endOfMonth(viewDate);
+  const startDate = startOfWeek(monthStart);
+  const endDate = endOfWeek(monthEnd);
+  
+  const days = eachDayOfInterval({ start: startDate, end: endDate });
+
+  const nextMonth = () => setViewDate(addMonths(viewDate, 1));
+  const prevMonth = () => setViewDate(subMonths(viewDate, 1));
+
+  return (
+    <div className="absolute top-full mt-4 left-1/2 -translate-x-1/2 bg-[#18181b] border border-white/10 rounded-[2rem] p-6 shadow-2xl z-50 w-[320px] animate-in slide-in-from-top-2 fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-4">
+            <button onClick={(e) => { e.preventDefault(); prevMonth(); }} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronLeft size={16} /></button>
+            <span className="text-sm font-bold uppercase tracking-widest">{format(viewDate, 'MMMM yyyy')}</span>
+            <button onClick={(e) => { e.preventDefault(); nextMonth(); }} className="p-2 hover:bg-white/10 rounded-full transition-colors"><ChevronRight size={16} /></button>
+        </div>
+
+        {/* Days Header */}
+        <div className="grid grid-cols-7 mb-2">
+            {['S','M','T','W','T','F','S'].map(d => (
+                <div key={d} className="text-center text-[10px] font-black uppercase text-gray-500">{d}</div>
+            ))}
+        </div>
+
+        {/* Days Grid */}
+        <div className="grid grid-cols-7 gap-1">
+            {days.map(day => {
+                const isSelected = format(day, 'yyyy-MM-dd') === value;
+                const isCurrentMonth = isSameMonth(day, viewDate);
+                const isTodayDate = isToday(day);
+
+                return (
+                    <button
+                        key={day.toISOString()}
+                        onClick={() => { onChange(format(day, 'yyyy-MM-dd')); onClose(); }}
+                        className={`
+                            aspect-square rounded-full flex items-center justify-center text-xs transition-all relative
+                            ${!isCurrentMonth ? 'text-gray-600' : 'text-gray-200'}
+                            ${isSelected ? 'bg-pastel-purple text-black font-bold shadow-[0_0_10px_rgba(207,186,240,0.5)] scale-110 z-10' : 'hover:bg-white/10'}
+                        `}
+                    >
+                        {format(day, 'd')}
+                        {isTodayDate && !isSelected && (
+                            <div className="absolute bottom-1 w-1 h-1 bg-pastel-purple rounded-full"></div>
+                        )}
+                    </button>
+                );
+            })}
+        </div>
+    </div>
+  );
+};
 
 // --- Button Time Picker Component ---
 interface TimeColumnProps {
@@ -166,8 +245,9 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
   const isDraggingRef = useRef(false);
   const itemsRef = useRef<(HTMLDivElement | null)[]>([]);
   
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const selectedDate = searchParams.get('date') || new Date().toISOString().split('T')[0];
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const dateButtonRef = useRef<HTMLDivElement>(null);
 
   const currentLog = state.logs[selectedDate] || {
     date: selectedDate,
@@ -190,6 +270,9 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
       if (timePickerRef.current && !timePickerRef.current.contains(event.target as Node)) {
         setShowTimePicker(false);
       }
+      if (dateButtonRef.current && !dateButtonRef.current.contains(event.target as Node)) {
+        setShowDatePicker(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -197,6 +280,16 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
 
   const handleDateChange = (newDate: string) => {
     setSearchParams({ date: newDate });
+  };
+
+  const goToPrevDay = () => {
+    playPopSound();
+    handleDateChange(format(addDays(new Date(selectedDate), -1), 'yyyy-MM-dd'));
+  };
+
+  const goToNextDay = () => {
+    playPopSound();
+    handleDateChange(format(addDays(new Date(selectedDate), 1), 'yyyy-MM-dd'));
   };
 
   const toggleMood = (moodId: string) => {
@@ -588,21 +681,40 @@ const Tracker: React.FC<TrackerProps> = ({ state, updateLog, updateCategories, u
         </div>
       )}
 
-      <header className="text-center space-y-2">
+      <header className="text-center space-y-4">
         <h1 className="text-4xl font-bold tracking-tighter">Daily Log</h1>
-        <div 
-          onClick={() => dateInputRef.current?.showPicker()}
-          className="inline-flex items-center gap-2 cursor-pointer bg-white/5 hover:bg-white/10 px-4 py-1.5 rounded-full border border-white/5 transition-all group"
-        >
-          <Calendar size={14} className="text-theme-accent" />
-          <span className="opacity-60 text-sm">Currently viewing: <span className="opacity-100 font-medium">{formattedDisplayDate}</span></span>
-          <input 
-            ref={dateInputRef}
-            type="date" 
-            value={selectedDate}
-            onChange={(e) => handleDateChange(e.target.value)}
-            className="absolute opacity-0 w-0 h-0 pointer-events-none"
-          />
+        <div className="flex items-center justify-center gap-2">
+            <button 
+                onClick={goToPrevDay}
+                className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/5 text-gray-400 hover:text-white"
+            >
+                <ChevronLeft size={18} />
+            </button>
+
+            <div className="relative" ref={dateButtonRef}>
+                <button 
+                    onClick={() => { playPopSound(); setShowDatePicker(!showDatePicker); }}
+                    className="flex items-center gap-3 cursor-pointer bg-white/5 hover:bg-white/10 px-6 py-3 rounded-full border border-white/5 transition-all group min-w-[240px] justify-center"
+                >
+                    <Calendar size={16} className="text-theme-accent" />
+                    <span className="text-sm font-medium">{formattedDisplayDate}</span>
+                </button>
+                
+                {showDatePicker && (
+                    <MiniCalendar 
+                        value={selectedDate} 
+                        onChange={handleDateChange} 
+                        onClose={() => setShowDatePicker(false)}
+                    />
+                )}
+            </div>
+
+            <button 
+                onClick={goToNextDay}
+                className="p-3 bg-white/5 rounded-full hover:bg-white/10 transition-colors border border-white/5 text-gray-400 hover:text-white"
+            >
+                <ChevronRight size={18} />
+            </button>
         </div>
       </header>
 
