@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { fetchUserData, saveUserDataAsync, logoutUser, getSession } from './services/storageService';
-import { AppState, DayLog, Highlight, UserData, Category, MoodConfig, HighlightCategory, UserPreferences, Task } from './types';
+import { AppState, DayLog, Highlight, UserData, Category, MoodConfig, HighlightCategory, UserPreferences, Task, StreakData } from './types';
 import { supabase } from './supabaseClient';
-import Dashboard from './pages/Dashboard';
-import Tracker from './pages/Tracker';
-import Database from './pages/Database';
+import Today from './pages/Today';
+import Timeline from './pages/Timeline';
 import Calendar from './pages/Calendar';
 import Highlights from './pages/Highlights';
 import Settings from './pages/Settings';
 import Statistics from './pages/Statistics';
 import Login from './pages/Login';
 import Confirmed from './pages/Confirmed';
-import { Home, Calendar as CalendarIcon, Database as DatabaseIcon, Star, Menu, X, Clock, LogOut, Settings as SettingsIcon, Loader2, PieChart } from 'lucide-react';
+import { Sun, Calendar as CalendarIcon, Clock, Star, Menu, X, LogOut, Settings as SettingsIcon, Loader2, PieChart } from 'lucide-react';
 import { DEFAULT_CATEGORIES, DEFAULT_EXPENDITURE_CATEGORIES, DEFAULT_MOODS, DEFAULT_HIGHLIGHT_CATEGORIES } from './constants';
 import { addDays, format } from 'date-fns';
 
@@ -26,7 +25,8 @@ const App: React.FC = () => {
     categories: DEFAULT_CATEGORIES,
     expenditureCategories: DEFAULT_EXPENDITURE_CATEGORIES,
     highlightCategories: DEFAULT_HIGHLIGHT_CATEGORIES,
-    moods: DEFAULT_MOODS
+    moods: DEFAULT_MOODS,
+    streaks: { currentStreak: 0, longestStreak: 0, lastLogDate: '' }
   });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -244,7 +244,8 @@ const App: React.FC = () => {
           categories: DEFAULT_CATEGORIES,
           expenditureCategories: DEFAULT_EXPENDITURE_CATEGORIES,
           highlightCategories: DEFAULT_HIGHLIGHT_CATEGORIES,
-          moods: DEFAULT_MOODS
+          moods: DEFAULT_MOODS,
+          streaks: { currentStreak: 0, longestStreak: 0, lastLogDate: '' }
         });
       }
     };
@@ -317,6 +318,10 @@ const App: React.FC = () => {
 
   const updatePreferences = (preferences: UserPreferences) => {
     setUserData(prev => ({ ...prev, preferences: { ...prev.preferences, ...preferences } }));
+  };
+
+  const updateStreaks = (streaks: StreakData) => {
+    setUserData(prev => ({ ...prev, streaks }));
   };
 
   const addHighlight = (h: Highlight) => {
@@ -425,12 +430,11 @@ const App: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <NavLink to="/" icon={<Home size={18} />} label="Overview" onClick={() => setIsMenuOpen(false)} />
-            <NavLink to="/tracker" icon={<Clock size={18} />} label="Tracker" onClick={() => setIsMenuOpen(false)} />
+            <NavLink to="/" icon={<Sun size={18} />} label="Today" onClick={() => setIsMenuOpen(false)} />
+            <NavLink to="/timeline" icon={<Clock size={18} />} label="Timeline" onClick={() => setIsMenuOpen(false)} />
             <NavLink to="/calendar" icon={<CalendarIcon size={18} />} label="Calendar" onClick={() => setIsMenuOpen(false)} />
-            <NavLink to="/stats" icon={<PieChart size={18} />} label="Statistics" onClick={() => setIsMenuOpen(false)} />
-            <NavLink to="/database" icon={<DatabaseIcon size={18} />} label="Archives" onClick={() => setIsMenuOpen(false)} />
-            <NavLink to="/highlights" icon={<Star size={18} />} label="Memories" onClick={() => setIsMenuOpen(false)} />
+            <NavLink to="/insights" icon={<PieChart size={18} />} label="Insights" onClick={() => setIsMenuOpen(false)} />
+            <NavLink to="/memories" icon={<Star size={18} />} label="Memories" onClick={() => setIsMenuOpen(false)} />
             <NavLink to="/settings" icon={<SettingsIcon size={18} />} label="Settings" onClick={() => setIsMenuOpen(false)} />
           </div>
 
@@ -447,18 +451,15 @@ const App: React.FC = () => {
         {/* Main Content */}
         <main className="md:ml-64 p-6 md:p-12 transition-all duration-500">
           <Routes>
-            <Route path="/" element={<DashboardWrapper state={appState} />} />
-            <Route path="/tracker" element={<Tracker 
+            <Route path="/" element={<Today 
               state={appState} 
-              updateLog={updateLog} 
-              updateCategories={updateCategories}
-              updateExpenditureCategories={updateExpenditureCategories}
-              updateMoods={updateMoods}
+              updateLog={updateLog}
+              updateStreaks={updateStreaks}
             />} />
+            <Route path="/timeline" element={<Timeline state={appState} />} />
             <Route path="/calendar" element={<Calendar state={appState} />} />
-            <Route path="/stats" element={<Statistics state={appState} />} />
-            <Route path="/database" element={<Database state={appState} onNavigate={(date) => {}} />} />
-            <Route path="/highlights" element={<Highlights state={appState} addHighlight={addHighlight} removeHighlight={removeHighlight} editHighlight={updateHighlight} updateHighlightCategories={updateHighlightCategories} />} />
+            <Route path="/insights" element={<Statistics state={appState} />} />
+            <Route path="/memories" element={<Highlights state={appState} addHighlight={addHighlight} removeHighlight={removeHighlight} editHighlight={updateHighlight} updateHighlightCategories={updateHighlightCategories} />} />
             <Route path="/settings" element={<Settings 
               state={appState} 
               updateCategories={updateCategories} 
@@ -476,14 +477,6 @@ const App: React.FC = () => {
     </Router>
   );
 };
-
-const DashboardWrapper = ({state}: {state: AppState}) => {
-    const navigate = useNavigate();
-    const handleNavigate = (path: string) => {
-        navigate(`/${path}`);
-    };
-    return <Dashboard state={state} onNavigate={handleNavigate} />;
-}
 
 const NavLink = ({ to, icon, label, onClick }: { to: string, icon: React.ReactNode, label: string, onClick: () => void }) => {
   const location = useLocation();

@@ -54,12 +54,19 @@ export interface Task {
 
 export interface DayLog {
   date: string; 
-  hours: Record<number, CategoryId[]>; 
+  hours: Record<number, CategoryId[]>; // Legacy - kept for backward compatibility
+  activities: CategoryId[]; // New simplified activity tracking
   expenses: Expense[];
   weight?: number;
   moods: string[]; 
   journalEntries: JournalEntry[];
   tasks: Task[]; 
+}
+
+export interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  lastLogDate: string; // YYYY-MM-DD
 }
 
 export interface ThemeConfig {
@@ -92,10 +99,11 @@ export interface UserData {
   highlights: Highlight[];
   categories: Category[];
   expenditureCategories: Category[];
-  highlightCategories: HighlightCategory[]; // New field
+  highlightCategories: HighlightCategory[];
   moods: MoodConfig[];
   preferences?: UserPreferences;
   displayName?: string;
+  streaks?: StreakData;
 }
 
 export interface UserAccount {
