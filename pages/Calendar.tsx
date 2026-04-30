@@ -133,7 +133,7 @@ const Calendar: React.FC<CalendarProps> = ({ state }) => {
           return (
             <div 
               key={dateStr}
-              onClick={() => navigate(`/tracker?date=${dateStr}`)}
+              onClick={() => navigate(`/?date=${dateStr}`)}
               className={`
                 min-h-[300px] rounded-[2rem] p-4 flex flex-col gap-4 border transition-all cursor-pointer relative group overflow-hidden
                 ${isTodayDate 
@@ -219,7 +219,7 @@ const Calendar: React.FC<CalendarProps> = ({ state }) => {
           return (
             <div 
               key={idx}
-              onClick={() => navigate(`/tracker?date=${dateStr}`)}
+              onClick={() => navigate(`/?date=${dateStr}`)}
               className={`
                 min-h-[120px] p-2 border-b border-r border-white/10 relative group transition-all cursor-pointer flex flex-col gap-1
                 ${!sameMonth ? 'opacity-20 bg-black/40' : 'bg-dark-card opacity-100'}
@@ -353,7 +353,7 @@ const Calendar: React.FC<CalendarProps> = ({ state }) => {
                                     return (
                                         <div 
                                             key={dateStr}
-                                            onClick={() => navigate(`/tracker?date=${dateStr}`)}
+                                            onClick={() => navigate(`/?date=${dateStr}`)}
                                             className={`aspect-square rounded-sm ${bgColor} cursor-pointer hover:scale-125 transition-transform`}
                                             title={`${dateStr} ${log?.moods?.[0] ? '- ' + log.moods[0] : ''}`}
                                         />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AppState, CategoryId, DayLog, Expense, Category, MoodConfig, JournalEntry, Task, StreakData } from '../types';
-import { Plus, Trash2, ChevronDown, ChevronUp, Circle, CheckCircle2, Image as ImageIcon, Flame, Sparkles, X } from 'lucide-react';
+import { AppState, CategoryId, DayLog, Expense, JournalEntry, Task, StreakData } from '../types';
+import { Plus, Trash2, ChevronDown, ChevronUp, Check, Image as ImageIcon, Flame, X } from 'lucide-react';
 import { playPopSound, playSuccessSound, processImage } from '../constants';
 import { format, differenceInDays, parseISO } from 'date-fns';
 
@@ -67,13 +67,10 @@ const Today: React.FC<TodayProps> = ({ state, updateLog, updateStreaks }) => {
       
       let newStreak = streaks.currentStreak;
       if (daysSinceLast === 1) {
-        // Consecutive day
         newStreak = streaks.currentStreak + 1;
       } else if (daysSinceLast > 1) {
-        // Streak broken
         newStreak = 1;
       } else if (daysSinceLast === 0) {
-        // Same day, don't change
         return;
       }
 
@@ -85,9 +82,8 @@ const Today: React.FC<TodayProps> = ({ state, updateLog, updateStreaks }) => {
         lastLogDate: today
       });
 
-      // Celebrate milestones
       if ([7, 14, 30, 50, 100].includes(newStreak)) {
-        setCelebrationMessage(`${newStreak} day streak!`);
+        setCelebrationMessage(`${newStreak} day streak`);
         setShowCelebration(true);
         playSuccessSound();
       }
@@ -105,7 +101,7 @@ const Today: React.FC<TodayProps> = ({ state, updateLog, updateStreaks }) => {
       days.push({
         date: dateStr,
         logged: log ? hasLoggedToday(log) : false,
-        dayName: format(date, 'EEEEE') // Single letter day
+        dayName: format(date, 'EEE')
       });
     }
     return days;
@@ -115,11 +111,10 @@ const Today: React.FC<TodayProps> = ({ state, updateLog, updateStreaks }) => {
   const daysLogged = weeklyData.filter(d => d.logged).length;
 
   // Mood selection
-  const toggleMood = (moodId: string) => {
+  const selectMood = (moodId: string) => {
     playPopSound();
-    const moods = currentLog.moods.includes(moodId)
-      ? currentLog.moods.filter(id => id !== moodId)
-      : [...currentLog.moods, moodId];
+    // Single mood selection for simplicity (like Daylio)
+    const moods = currentLog.moods.includes(moodId) ? [] : [moodId];
     updateLog(todayStr, { ...currentLog, moods });
   };
 
@@ -218,7 +213,7 @@ const Today: React.FC<TodayProps> = ({ state, updateLog, updateStreaks }) => {
     
     if (allCompleted && justCompleted) {
       setTimeout(() => {
-        setCelebrationMessage('All tasks done!');
+        setCelebrationMessage('All tasks done');
         setShowCelebration(true);
         playSuccessSound();
       }, 300);
@@ -249,368 +244,357 @@ const Today: React.FC<TodayProps> = ({ state, updateLog, updateStreaks }) => {
   };
 
   const totalExpenses = currentLog.expenses.reduce((sum, e) => sum + e.amount, 0);
+  const selectedMood = state.moods.find(m => currentLog.moods.includes(m.id));
 
   return (
-    <div className="max-w-2xl mx-auto pb-20">
+    <div className="min-h-screen pb-24">
       {/* Celebration Overlay */}
       {showCelebration && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md"
           onClick={() => setShowCelebration(false)}
         >
-          <div className="bg-gradient-to-br from-pastel-purple/20 to-pastel-pink/20 border border-white/10 rounded-[3rem] p-12 text-center animate-in zoom-in-95 duration-500">
-            <div className="text-6xl mb-4 animate-bounce">
-              <Sparkles className="inline text-pastel-yellow" size={64} />
+          <div className="text-center animate-in zoom-in-95 fade-in duration-500">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+              <Flame className="text-white" size={36} />
             </div>
-            <h2 className="text-3xl font-black mb-2">{celebrationMessage}</h2>
-            <p className="text-gray-400 text-sm">Keep up the amazing work!</p>
+            <h2 className="text-4xl font-bold mb-2 text-white">{celebrationMessage}</h2>
+            <p className="text-gray-400">Keep going, you&apos;re doing great</p>
           </div>
         </div>
       )}
 
-      {/* Header with Date & Streak */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-black mb-2">
-          {format(new Date(), 'EEEE')}
-          <span className="text-gray-500 font-normal ml-2 text-xl">
-            {format(new Date(), 'MMMM d')}
-          </span>
+      {/* Minimal Header */}
+      <header className="pt-8 pb-12 text-center">
+        <p className="text-sm text-gray-500 mb-1">{format(new Date(), 'EEEE')}</p>
+        <h1 className="text-3xl font-semibold tracking-tight">
+          {format(new Date(), 'MMMM d')}
         </h1>
         
-        {/* Streak & Weekly Ring */}
-        <div className="flex items-center gap-6 mt-4">
-          {/* Streak Counter */}
-          <div className="flex items-center gap-2 bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-500/30 rounded-2xl px-4 py-2">
-            <Flame className={`${streaks.currentStreak > 0 ? 'text-orange-400' : 'text-gray-500'}`} size={20} />
-            <span className="font-black text-lg">{streaks.currentStreak}</span>
-            <span className="text-xs text-gray-400 uppercase tracking-wider">day streak</span>
+        {/* Streak - subtle */}
+        {streaks.currentStreak > 0 && (
+          <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-full bg-white/5">
+            <Flame className="text-amber-400" size={16} />
+            <span className="text-sm text-gray-300">{streaks.currentStreak} day streak</span>
           </div>
+        )}
+      </header>
 
-          {/* Weekly Ring */}
-          <div className="flex items-center gap-1">
-            {weeklyData.map((day, i) => (
-              <div key={i} className="flex flex-col items-center gap-1">
-                <div 
-                  className={`w-6 h-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center text-[10px] font-bold
-                    ${day.logged 
-                      ? 'bg-pastel-purple border-pastel-purple text-black' 
-                      : 'border-gray-700 text-gray-600'
+      <div className="max-w-lg mx-auto px-4 space-y-12">
+        
+        {/* Mood Selection - Large, centered like Daylio */}
+        <section className="text-center">
+          <p className="text-sm text-gray-500 mb-6">How are you?</p>
+          <div className="flex justify-center gap-4">
+            {state.moods.map(mood => {
+              const isSelected = currentLog.moods.includes(mood.id);
+              return (
+                <button
+                  key={mood.id}
+                  onClick={() => selectMood(mood.id)}
+                  className={`
+                    flex flex-col items-center gap-2 p-4 rounded-2xl transition-all duration-300
+                    ${isSelected 
+                      ? 'bg-white/10 scale-110 ring-2 ring-white/20' 
+                      : 'hover:bg-white/5'
                     }
-                    ${day.date === todayStr ? 'ring-2 ring-pastel-purple/50 ring-offset-2 ring-offset-[#09090b]' : ''}
                   `}
                 >
-                  {day.logged && '✓'}
-                </div>
-                <span className="text-[9px] text-gray-500">{day.dayName}</span>
-              </div>
-            ))}
+                  <span className={`text-4xl transition-transform duration-300 ${isSelected ? 'scale-110' : ''}`}>
+                    {mood.emoji}
+                  </span>
+                  <span className={`text-xs transition-colors ${isSelected ? 'text-white' : 'text-gray-500'}`}>
+                    {mood.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <span className="text-xs text-gray-500">{daysLogged}/7</span>
-        </div>
-      </div>
+        </section>
 
-      {/* Mood Selection */}
-      <section className="mb-8">
-        <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-4">
-          How are you feeling?
-        </h2>
-        <div className="flex flex-wrap gap-3">
-          {state.moods.map(mood => {
-            const isSelected = currentLog.moods.includes(mood.id);
-            return (
+        {/* Activities - Clean pills */}
+        <section>
+          <p className="text-sm text-gray-500 mb-4 text-center">What have you been up to?</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {state.categories.map(cat => {
+              const isSelected = (currentLog.activities || []).includes(cat.id);
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => toggleActivity(cat.id)}
+                  className={`
+                    px-4 py-2 rounded-full text-sm transition-all duration-200
+                    ${isSelected 
+                      ? 'bg-white/15 text-white ring-1 ring-white/20' 
+                      : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-gray-300'
+                    }
+                  `}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Journal - Clean writing space */}
+        <section>
+          <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/5">
+            <textarea
+              value={journalText}
+              onChange={(e) => setJournalText(e.target.value)}
+              placeholder="Write something..."
+              className="w-full bg-transparent resize-none focus:outline-none text-base placeholder-gray-600 min-h-[140px] leading-relaxed"
+            />
+            
+            {/* Photo Preview */}
+            {journalPhotos.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-white/5">
+                {journalPhotos.map((photo, i) => (
+                  <div key={i} className="relative group">
+                    <img src={photo} alt="" className="w-20 h-20 object-cover rounded-xl" />
+                    <button
+                      onClick={() => removePhoto(i)}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500/80 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
+              <label className="cursor-pointer p-2 rounded-xl hover:bg-white/5 transition-colors">
+                <ImageIcon size={20} className={isUploading ? 'text-gray-600' : 'text-gray-500'} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                  disabled={isUploading}
+                />
+              </label>
               <button
-                key={mood.id}
-                onClick={() => toggleMood(mood.id)}
-                className={`
-                  flex items-center gap-2 px-5 py-3 rounded-2xl text-base transition-all duration-200 
-                  ${isSelected 
-                    ? 'bg-pastel-purple text-black scale-105 shadow-[0_0_20px_rgba(207,186,240,0.4)]' 
-                    : 'bg-white/5 hover:bg-white/10 border border-white/5'
-                  }
-                `}
+                onClick={saveJournalEntry}
+                disabled={!journalText.trim() && journalPhotos.length === 0}
+                className="px-5 py-2 bg-white/10 text-white text-sm rounded-full disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 transition-colors"
               >
-                <span className="text-2xl">{mood.emoji}</span>
-                <span className="font-medium">{mood.label}</span>
+                {editingJournalId ? 'Update' : 'Save'}
               </button>
-            );
-          })}
-        </div>
-      </section>
+            </div>
+          </div>
 
-      {/* Activity Pills */}
-      <section className="mb-8">
-        <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-4">
-          What did you do today?
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {state.categories.map(cat => {
-            const isSelected = (currentLog.activities || []).includes(cat.id);
-            return (
-              <button
-                key={cat.id}
-                onClick={() => toggleActivity(cat.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all duration-200
-                  ${isSelected 
-                    ? `${cat.color} text-black font-semibold scale-105` 
-                    : 'bg-white/5 hover:bg-white/10 border border-white/5'
-                  }
-                `}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Journal - Prominent */}
-      <section className="mb-8">
-        <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-4">
-          Journal
-        </h2>
-        <div className="bg-white/5 border border-white/10 rounded-3xl p-6">
-          <textarea
-            value={journalText}
-            onChange={(e) => setJournalText(e.target.value)}
-            placeholder="Write about your day..."
-            className="w-full bg-transparent resize-none focus:outline-none text-base placeholder-gray-600 min-h-[120px]"
-          />
-          
-          {/* Photo Preview */}
-          {journalPhotos.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-4 mb-4">
-              {journalPhotos.map((photo, i) => (
-                <div key={i} className="relative group">
-                  <img src={photo} alt="" className="w-20 h-20 object-cover rounded-xl" />
-                  <button
-                    onClick={() => removePhoto(i)}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X size={14} />
-                  </button>
+          {/* Journal Entries */}
+          {currentLog.journalEntries.length > 0 && (
+            <div className="mt-6 space-y-4">
+              {currentLog.journalEntries.map(entry => (
+                <div key={entry.id} className="bg-white/[0.02] rounded-2xl p-5 group border border-white/5">
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="text-xs text-gray-500">{entry.timestamp}</span>
+                    <div className="opacity-0 group-hover:opacity-100 flex gap-3 transition-opacity">
+                      <button onClick={() => editJournalEntry(entry)} className="text-gray-500 hover:text-white text-xs">Edit</button>
+                      <button onClick={() => deleteJournalEntry(entry.id)} className="text-gray-500 hover:text-red-400 text-xs">Delete</button>
+                    </div>
+                  </div>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-300">{entry.text}</p>
+                  {entry.photos && entry.photos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      {entry.photos.map((photo, i) => (
+                        <img key={i} src={photo} alt="" className="w-20 h-20 object-cover rounded-xl" />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
+        </section>
 
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/5">
-            <label className="cursor-pointer flex items-center gap-2 text-gray-500 hover:text-gray-300 transition-colors">
-              <ImageIcon size={18} />
-              <span className="text-xs uppercase tracking-wider">
-                {isUploading ? 'Uploading...' : 'Add Photo'}
-              </span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoUpload}
-                className="hidden"
-                disabled={isUploading}
-              />
-            </label>
-            <button
-              onClick={saveJournalEntry}
-              disabled={!journalText.trim() && journalPhotos.length === 0}
-              className="px-6 py-2 bg-pastel-purple text-black font-bold text-xs uppercase tracking-wider rounded-xl disabled:opacity-30 hover:bg-pastel-pink transition-colors"
-            >
-              {editingJournalId ? 'Update' : 'Save'}
-            </button>
-          </div>
-        </div>
-
-        {/* Journal Entries */}
-        {currentLog.journalEntries.length > 0 && (
-          <div className="mt-4 space-y-3">
-            {currentLog.journalEntries.map(entry => (
-              <div key={entry.id} className="bg-white/5 border border-white/5 rounded-2xl p-4 group">
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs text-gray-500">{entry.timestamp}</span>
-                  <div className="opacity-0 group-hover:opacity-100 flex gap-2 transition-opacity">
-                    <button onClick={() => editJournalEntry(entry)} className="text-gray-500 hover:text-white text-xs">Edit</button>
-                    <button onClick={() => deleteJournalEntry(entry.id)} className="text-red-400 hover:text-red-300 text-xs">Delete</button>
-                  </div>
+        {/* Weekly Overview - Subtle */}
+        <section className="py-6 border-t border-white/5">
+          <div className="flex justify-between items-center">
+            {weeklyData.map((day, i) => (
+              <div key={i} className="flex flex-col items-center gap-2">
+                <span className="text-[10px] text-gray-500 uppercase">{day.dayName}</span>
+                <div 
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all
+                    ${day.logged 
+                      ? 'bg-white/10' 
+                      : 'bg-transparent border border-white/10'
+                    }
+                    ${day.date === todayStr ? 'ring-2 ring-white/20 ring-offset-2 ring-offset-[#09090b]' : ''}
+                  `}
+                >
+                  {day.logged && <Check size={14} className="text-white/70" />}
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{entry.text}</p>
-                {entry.photos && entry.photos.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {entry.photos.map((photo, i) => (
-                      <img key={i} src={photo} alt="" className="w-16 h-16 object-cover rounded-lg" />
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
           </div>
-        )}
-      </section>
+          <p className="text-center text-xs text-gray-500 mt-4">{daysLogged} of 7 days logged</p>
+        </section>
 
-      {/* Tasks - Collapsible */}
-      <section className="mb-6">
-        <button
-          onClick={() => setTasksExpanded(!tasksExpanded)}
-          className="w-full flex items-center justify-between py-3 text-left"
-        >
-          <div className="flex items-center gap-3">
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500">
-              Tasks
-            </h2>
-            {tasks.length > 0 && (
-              <span className="bg-white/10 px-2 py-0.5 rounded-full text-xs">
-                {tasks.filter(t => t.completed).length}/{tasks.length}
-              </span>
-            )}
-          </div>
-          {tasksExpanded ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
-        </button>
-        
-        {tasksExpanded && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 animate-in slide-in-from-top-2 duration-200">
-            {/* Add Task */}
-            <div className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addTask()}
-                placeholder="Add a task..."
-                className="flex-1 bg-white/5 border border-white/5 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-pastel-purple/50"
-              />
-              <button
-                onClick={addTask}
-                disabled={!newTaskTitle.trim()}
-                className="px-4 py-2 bg-pastel-purple text-black rounded-xl disabled:opacity-30"
-              >
-                <Plus size={18} />
-              </button>
-            </div>
-            
-            {/* Task List */}
-            <div className="space-y-2">
-              {tasks.map(task => (
-                <div 
-                  key={task.id} 
-                  className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${task.completed ? 'bg-pastel-green/10' : 'bg-white/5'}`}
-                >
-                  <button onClick={() => toggleTask(task.id)} className="flex-shrink-0">
-                    {task.completed 
-                      ? <CheckCircle2 className="text-pastel-green" size={22} />
-                      : <Circle className="text-gray-500" size={22} />
-                    }
-                  </button>
-                  <span className={`flex-1 text-sm ${task.completed ? 'line-through text-gray-500' : ''}`}>
-                    {task.title}
+        {/* Optional Sections - Collapsible */}
+        <div className="space-y-2 border-t border-white/5 pt-6">
+          
+          {/* Tasks */}
+          <div className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden">
+            <button
+              onClick={() => setTasksExpanded(!tasksExpanded)}
+              className="w-full flex items-center justify-between p-4"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-400">Tasks</span>
+                {tasks.length > 0 && (
+                  <span className="text-xs text-gray-500">
+                    {tasks.filter(t => t.completed).length}/{tasks.length}
                   </span>
-                  <button 
-                    onClick={() => deleteTask(task.id)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all"
+                )}
+              </div>
+              {tasksExpanded ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+            </button>
+            
+            {tasksExpanded && (
+              <div className="px-4 pb-4 animate-in slide-in-from-top-1 duration-150">
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addTask()}
+                    placeholder="Add task..."
+                    className="flex-1 bg-white/5 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 placeholder-gray-600"
+                  />
+                  <button
+                    onClick={addTask}
+                    disabled={!newTaskTitle.trim()}
+                    className="px-4 py-2 bg-white/10 rounded-xl disabled:opacity-30 hover:bg-white/15 transition-colors"
                   >
-                    <Trash2 size={16} />
+                    <Plus size={16} />
                   </button>
                 </div>
-              ))}
-              {tasks.length === 0 && (
-                <p className="text-center text-gray-500 text-sm py-4">No tasks for today</p>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Expenses - Collapsible */}
-      <section className="mb-6">
-        <button
-          onClick={() => setExpensesExpanded(!expensesExpanded)}
-          className="w-full flex items-center justify-between py-3 text-left"
-        >
-          <div className="flex items-center gap-3">
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500">
-              Spending
-            </h2>
-            {currentLog.expenses.length > 0 && (
-              <span className="bg-white/10 px-2 py-0.5 rounded-full text-xs">
-                ₱{totalExpenses.toLocaleString()}
-              </span>
+                
+                <div className="space-y-1">
+                  {tasks.map(task => (
+                    <div 
+                      key={task.id} 
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 group transition-colors"
+                    >
+                      <button 
+                        onClick={() => toggleTask(task.id)} 
+                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all
+                          ${task.completed 
+                            ? 'bg-white/20 border-white/20' 
+                            : 'border-gray-600 hover:border-gray-400'
+                          }
+                        `}
+                      >
+                        {task.completed && <Check size={12} className="text-white" />}
+                      </button>
+                      <span className={`flex-1 text-sm ${task.completed ? 'line-through text-gray-500' : 'text-gray-300'}`}>
+                        {task.title}
+                      </span>
+                      <button 
+                        onClick={() => deleteTask(task.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded transition-all"
+                      >
+                        <Trash2 size={14} className="text-gray-500" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
-          {expensesExpanded ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
-        </button>
-        
-        {expensesExpanded && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 animate-in slide-in-from-top-2 duration-200">
-            {/* Quick Add */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {state.expenditureCategories.slice(0, 6).map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setExpenseCategory(cat.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs transition-all ${
-                    expenseCategory === cat.id 
-                      ? `${cat.color} text-black font-bold` 
-                      : 'bg-white/5 hover:bg-white/10'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
 
-            <div className="flex gap-2 mb-4">
-              <input
-                type="number"
-                value={expenseAmount}
-                onChange={(e) => setExpenseAmount(e.target.value)}
-                placeholder="₱ Amount"
-                className="w-28 bg-white/5 border border-white/5 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-pastel-purple/50"
-              />
-              <input
-                type="text"
-                value={expenseDescription}
-                onChange={(e) => setExpenseDescription(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addExpense()}
-                placeholder="Description (optional)"
-                className="flex-1 bg-white/5 border border-white/5 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-pastel-purple/50"
-              />
-              <button
-                onClick={addExpense}
-                disabled={!expenseAmount || parseFloat(expenseAmount) <= 0}
-                className="px-4 py-2 bg-pastel-purple text-black rounded-xl disabled:opacity-30"
-              >
-                <Plus size={18} />
-              </button>
-            </div>
-
-            {/* Expense List */}
-            <div className="space-y-2">
-              {currentLog.expenses.map(expense => {
-                const cat = state.expenditureCategories.find(c => c.id === expense.category);
-                return (
-                  <div key={expense.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 group">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${cat?.color || 'bg-gray-500'}`} />
-                      <div>
-                        <span className="text-sm font-medium">₱{expense.amount.toLocaleString()}</span>
-                        {expense.description && (
-                          <span className="text-gray-500 text-sm ml-2">{expense.description}</span>
-                        )}
-                      </div>
-                    </div>
-                    <button 
-                      onClick={() => deleteExpense(expense.id)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 transition-all"
+          {/* Spending */}
+          <div className="bg-white/[0.02] rounded-2xl border border-white/5 overflow-hidden">
+            <button
+              onClick={() => setExpensesExpanded(!expensesExpanded)}
+              className="w-full flex items-center justify-between p-4"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-400">Spending</span>
+                {currentLog.expenses.length > 0 && (
+                  <span className="text-xs text-gray-500">P{totalExpenses.toLocaleString()}</span>
+                )}
+              </div>
+              {expensesExpanded ? <ChevronUp size={16} className="text-gray-500" /> : <ChevronDown size={16} className="text-gray-500" />}
+            </button>
+            
+            {expensesExpanded && (
+              <div className="px-4 pb-4 animate-in slide-in-from-top-1 duration-150">
+                {/* Category chips */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {state.expenditureCategories.slice(0, 6).map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setExpenseCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                        expenseCategory === cat.id 
+                          ? 'bg-white/15 text-white' 
+                          : 'bg-white/5 text-gray-500 hover:bg-white/10'
+                      }`}
                     >
-                      <Trash2 size={16} />
+                      {cat.label}
                     </button>
-                  </div>
-                );
-              })}
-              {currentLog.expenses.length === 0 && (
-                <p className="text-center text-gray-500 text-sm py-4">No expenses logged</p>
-              )}
-            </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="number"
+                    value={expenseAmount}
+                    onChange={(e) => setExpenseAmount(e.target.value)}
+                    placeholder="0"
+                    className="w-24 bg-white/5 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 placeholder-gray-600"
+                  />
+                  <input
+                    type="text"
+                    value={expenseDescription}
+                    onChange={(e) => setExpenseDescription(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addExpense()}
+                    placeholder="Note (optional)"
+                    className="flex-1 bg-white/5 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 placeholder-gray-600"
+                  />
+                  <button
+                    onClick={addExpense}
+                    disabled={!expenseAmount || parseFloat(expenseAmount) <= 0}
+                    className="px-4 py-2 bg-white/10 rounded-xl disabled:opacity-30 hover:bg-white/15 transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+
+                <div className="space-y-1">
+                  {currentLog.expenses.map(expense => {
+                    const cat = state.expenditureCategories.find(c => c.id === expense.category);
+                    return (
+                      <div key={expense.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 group transition-colors">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-gray-300">P{expense.amount.toLocaleString()}</span>
+                          {expense.description && (
+                            <span className="text-xs text-gray-500">{expense.description}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">{cat?.label}</span>
+                          <button 
+                            onClick={() => deleteExpense(expense.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded transition-all"
+                          >
+                            <Trash2 size={14} className="text-gray-500" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </section>
+        </div>
+      </div>
     </div>
   );
 };

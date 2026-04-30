@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AppState, DayLog } from '../types';
-import { Search, ArrowUpDown, Image as ImageIcon, X, BookOpen, Calendar, Clock, ChevronRight } from 'lucide-react';
+import { Search, Image as ImageIcon, X, BookOpen, Clock, ChevronLeft } from 'lucide-react';
 import { format, parseISO, isToday, isYesterday, isThisWeek, isThisMonth } from 'date-fns';
 
 interface TimelineProps {
@@ -37,9 +36,7 @@ const groupByPeriod = (dates: string[]): Record<string, string[]> => {
 };
 
 const Timeline: React.FC<TimelineProps> = ({ state }) => {
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   
   // Viewer States
@@ -50,10 +47,8 @@ const Timeline: React.FC<TimelineProps> = ({ state }) => {
   const loggedDates = useMemo(() => {
     return Object.entries(state.logs)
       .filter(([dateStr, log]) => {
-        // Filter by month
         if (selectedMonth && !dateStr.startsWith(selectedMonth)) return false;
         
-        // Must have some content
         const hasContent = 
           log.moods.length > 0 ||
           (log.activities?.length || 0) > 0 ||
@@ -61,7 +56,6 @@ const Timeline: React.FC<TimelineProps> = ({ state }) => {
         
         if (!hasContent) return false;
 
-        // Search filter
         if (searchTerm) {
           const searchLower = searchTerm.toLowerCase();
           const hasMatchingJournal = log.journalEntries.some(e => 
@@ -86,320 +80,280 @@ const Timeline: React.FC<TimelineProps> = ({ state }) => {
         return true;
       })
       .map(([dateStr]) => dateStr)
-      .sort((a, b) => sortOrder === 'desc' ? b.localeCompare(a) : a.localeCompare(b));
-  }, [state.logs, searchTerm, sortOrder, selectedMonth, state.moods, state.categories]);
+      .sort((a, b) => b.localeCompare(a));
+  }, [state.logs, searchTerm, selectedMonth, state.moods, state.categories]);
 
   const groupedDates = useMemo(() => groupByPeriod(loggedDates), [loggedDates]);
 
   // Get preview data for a day
   const getDayPreview = (log: DayLog) => {
-    const moodEmojis = log.moods.map(m => state.moods.find(mood => mood.id === m)?.emoji).filter(Boolean);
+    const moodEmoji = log.moods[0] ? state.moods.find(mood => mood.id === log.moods[0])?.emoji : null;
     const activities = (log.activities || [])
       .map(a => state.categories.find(c => c.id === a))
       .filter(Boolean)
-      .slice(0, 4);
+      .slice(0, 3);
     const firstJournal = log.journalEntries[0];
     const photoCount = log.journalEntries.reduce((sum, e) => sum + (e.photos?.length || 0), 0);
     
-    return { moodEmojis, activities, firstJournal, photoCount, entryCount: log.journalEntries.length };
+    return { moodEmoji, activities, firstJournal, photoCount, entryCount: log.journalEntries.length };
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-20 max-w-3xl mx-auto">
+    <div className="min-h-screen pb-24">
       
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-[#09090b]/95 backdrop-blur-xl py-6 -mx-4 px-4 border-b border-white/5">
-        <div className="flex flex-col gap-4">
-          <div>
-            <h1 className="text-3xl font-black tracking-tight">Timeline</h1>
-            <p className="text-sm text-gray-500 mt-1">{loggedDates.length} entries</p>
-          </div>
+      <header className="pt-8 pb-6 px-4 max-w-2xl mx-auto">
+        <h1 className="text-2xl font-semibold mb-6">Timeline</h1>
 
-          <div className="flex gap-3">
-            {/* Search */}
-            <div className="relative group flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-pastel-purple transition-colors" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search your timeline..."
-                className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-10 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-pastel-purple/50 transition-all placeholder-gray-600"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white">
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-            
-            {/* Month Filter */}
+        <div className="flex gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
             <input 
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-white/5 border border-white/10 rounded-2xl px-4 py-2 text-sm text-gray-400 focus:outline-none focus:text-white focus:border-white/30 transition-all cursor-pointer hover:bg-white/10 w-36"
+              type="text" 
+              placeholder="Search..."
+              className="w-full bg-white/5 border border-white/5 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-white/20 placeholder-gray-600"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
-            
-            {/* Sort */}
-            <button 
-              onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-              className="aspect-square h-11 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all"
-              title={`Sort ${sortOrder === 'desc' ? 'Oldest First' : 'Newest First'}`}
-            >
-              <ArrowUpDown size={18} className={sortOrder === 'asc' ? 'rotate-180 transition-transform' : 'transition-transform'} />
-            </button>
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white p-1">
+                <X size={14} />
+              </button>
+            )}
           </div>
+          
+          {/* Month Filter */}
+          <input 
+            type="month"
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="bg-white/5 border border-white/5 rounded-xl px-4 py-2 text-sm text-gray-400 focus:outline-none focus:text-white cursor-pointer hover:bg-white/10 transition-colors"
+          />
         </div>
+        
+        <p className="text-xs text-gray-500 mt-4">{loggedDates.length} entries</p>
       </header>
 
       {/* Timeline Feed */}
-      {loggedDates.length === 0 ? (
-        <div className="py-24 flex flex-col items-center justify-center gap-6 text-center">
-          <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center">
-            <BookOpen size={32} className="text-gray-600" />
+      <div className="max-w-2xl mx-auto px-4">
+        {loggedDates.length === 0 ? (
+          <div className="py-24 flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
+              <BookOpen size={24} className="text-gray-600" />
+            </div>
+            <p className="text-gray-400">No entries yet</p>
+            <p className="text-sm text-gray-600 mt-1">Start logging to see your timeline</p>
           </div>
-          <div className="space-y-1">
-            <p className="text-lg font-medium text-gray-300">No entries found</p>
-            <p className="text-sm text-gray-500">Start logging your days to see them here</p>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {Object.entries(groupedDates).map(([period, dates]) => {
-            if (dates.length === 0) return null;
-            
-            return (
-              <div key={period}>
-                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-4 sticky top-[140px] bg-[#09090b]/95 backdrop-blur-sm py-2 -mx-4 px-4">
-                  {period}
-                </h2>
-                
-                <div className="space-y-4">
-                  {dates.map(dateStr => {
-                    const log = state.logs[dateStr];
-                    const preview = getDayPreview(log);
-                    
-                    return (
-                      <div
-                        key={dateStr}
-                        onClick={() => setViewingEntry({ date: dateStr, log })}
-                        className="bg-white/5 border border-white/5 rounded-3xl p-5 hover:bg-white/[0.07] hover:border-white/10 transition-all cursor-pointer group"
-                      >
-                        {/* Date Header */}
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="text-2xl font-black text-pastel-purple">
-                              {format(parseISO(dateStr), 'd')}
-                            </div>
-                            <div>
-                              <div className="text-sm font-medium">
-                                {format(parseISO(dateStr), 'EEEE')}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {format(parseISO(dateStr), 'MMMM yyyy')}
+        ) : (
+          <div className="space-y-8">
+            {Object.entries(groupedDates).map(([period, dates]) => {
+              if (dates.length === 0) return null;
+              
+              return (
+                <div key={period}>
+                  <h2 className="text-xs text-gray-500 uppercase tracking-wider mb-4 sticky top-0 bg-[#09090b] py-2">
+                    {period}
+                  </h2>
+                  
+                  <div className="space-y-3">
+                    {dates.map(dateStr => {
+                      const log = state.logs[dateStr];
+                      const preview = getDayPreview(log);
+                      
+                      return (
+                        <button
+                          key={dateStr}
+                          onClick={() => setViewingEntry({ date: dateStr, log })}
+                          className="w-full text-left bg-white/[0.02] border border-white/5 rounded-2xl p-5 hover:bg-white/[0.04] transition-colors group"
+                        >
+                          {/* Date Row */}
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              {preview.moodEmoji && (
+                                <span className="text-2xl">{preview.moodEmoji}</span>
+                              )}
+                              <div>
+                                <p className="font-medium">{format(parseISO(dateStr), 'EEEE, MMMM d')}</p>
+                                <p className="text-xs text-gray-500">{format(parseISO(dateStr), 'yyyy')}</p>
                               </div>
                             </div>
                           </div>
-                          
-                          <div className="flex items-center gap-2">
-                            {/* Mood Emojis */}
-                            {preview.moodEmojis.length > 0 && (
-                              <div className="flex -space-x-1">
-                                {preview.moodEmojis.slice(0, 3).map((emoji, i) => (
-                                  <span key={i} className="text-xl">{emoji}</span>
-                                ))}
-                              </div>
-                            )}
-                            <ChevronRight size={18} className="text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-all" />
-                          </div>
-                        </div>
 
-                        {/* Activities */}
-                        {preview.activities.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-3">
-                            {preview.activities.map(cat => (
-                              <span
-                                key={cat!.id}
-                                className={`px-2 py-0.5 rounded-lg text-xs ${cat!.color} text-black`}
-                              >
-                                {cat!.label}
-                              </span>
-                            ))}
-                            {(log.activities?.length || 0) > 4 && (
-                              <span className="px-2 py-0.5 rounded-lg text-xs bg-white/10">
-                                +{(log.activities?.length || 0) - 4}
-                              </span>
-                            )}
-                          </div>
-                        )}
+                          {/* Activities */}
+                          {preview.activities.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              {preview.activities.map(cat => (
+                                <span
+                                  key={cat!.id}
+                                  className="px-2.5 py-1 rounded-full text-xs bg-white/5 text-gray-400"
+                                >
+                                  {cat!.label}
+                                </span>
+                              ))}
+                              {(log.activities?.length || 0) > 3 && (
+                                <span className="px-2.5 py-1 rounded-full text-xs bg-white/5 text-gray-500">
+                                  +{(log.activities?.length || 0) - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
 
-                        {/* Journal Preview */}
-                        {preview.firstJournal && (
-                          <div className="flex gap-3">
-                            {preview.firstJournal.photos?.[0] && (
-                              <img 
-                                src={preview.firstJournal.photos[0]} 
-                                alt="" 
-                                className="w-16 h-16 object-cover rounded-xl flex-shrink-0"
-                              />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-gray-300 line-clamp-2">
-                                {preview.firstJournal.text}
-                              </p>
-                              <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                                {preview.entryCount > 1 && (
-                                  <span>{preview.entryCount} entries</span>
-                                )}
-                                {preview.photoCount > 0 && (
-                                  <span className="flex items-center gap-1">
-                                    <ImageIcon size={12} /> {preview.photoCount}
-                                  </span>
+                          {/* Journal Preview */}
+                          {preview.firstJournal && (
+                            <div className="flex gap-3">
+                              {preview.firstJournal.photos?.[0] && (
+                                <img 
+                                  src={preview.firstJournal.photos[0]} 
+                                  alt="" 
+                                  className="w-14 h-14 object-cover rounded-xl flex-shrink-0"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-gray-400 line-clamp-2 leading-relaxed">
+                                  {preview.firstJournal.text}
+                                </p>
+                                {(preview.entryCount > 1 || preview.photoCount > 0) && (
+                                  <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                                    {preview.entryCount > 1 && <span>{preview.entryCount} entries</span>}
+                                    {preview.photoCount > 0 && (
+                                      <span className="flex items-center gap-1">
+                                        <ImageIcon size={10} /> {preview.photoCount}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Entry Detail Modal */}
       {viewingEntry && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={() => setViewingEntry(null)}
+          className="fixed inset-0 z-50 bg-[#09090b]"
+          style={{ overflowY: 'auto' }}
         >
-          <div 
-            className="bg-[#18181b] border border-white/10 rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-[#18181b] border-b border-white/5 p-6 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-black">
-                  {format(parseISO(viewingEntry.date), 'MMMM d, yyyy')}
-                </h2>
-                <p className="text-sm text-gray-500">{format(parseISO(viewingEntry.date), 'EEEE')}</p>
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => {
-                    setViewingEntry(null);
-                    navigate(`/today?date=${viewingEntry.date}`);
-                  }}
-                  className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-sm transition-colors"
-                >
-                  Edit
-                </button>
-                <button 
-                  onClick={() => setViewingEntry(null)}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </div>
+          {/* Modal Header */}
+          <div className="sticky top-0 bg-[#09090b]/95 backdrop-blur-sm border-b border-white/5 px-4 py-4 flex items-center justify-between">
+            <button 
+              onClick={() => setViewingEntry(null)}
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+            >
+              <ChevronLeft size={20} />
+              <span className="text-sm">Back</span>
+            </button>
+            <span className="text-sm text-gray-500">
+              {format(parseISO(viewingEntry.date), 'MMM d, yyyy')}
+            </span>
+          </div>
 
-            <div className="p-6 space-y-6">
-              {/* Moods */}
+          <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
+            {/* Date Header */}
+            <header className="text-center pb-8 border-b border-white/5">
+              <p className="text-sm text-gray-500 mb-1">{format(parseISO(viewingEntry.date), 'EEEE')}</p>
+              <h2 className="text-3xl font-semibold">
+                {format(parseISO(viewingEntry.date), 'MMMM d, yyyy')}
+              </h2>
+              
+              {/* Mood */}
               {viewingEntry.log.moods.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-3">Feeling</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {viewingEntry.log.moods.map(moodId => {
-                      const mood = state.moods.find(m => m.id === moodId);
-                      return mood && (
-                        <span key={moodId} className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl">
-                          <span className="text-xl">{mood.emoji}</span>
-                          <span className="text-sm">{mood.label}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Activities */}
-              {(viewingEntry.log.activities?.length || 0) > 0 && (
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-3">Activities</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {viewingEntry.log.activities?.map(actId => {
-                      const cat = state.categories.find(c => c.id === actId);
-                      return cat && (
-                        <span key={actId} className={`px-3 py-1.5 rounded-xl text-sm ${cat.color} text-black`}>
-                          {cat.label}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Journal Entries */}
-              {viewingEntry.log.journalEntries.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-3">Journal</h3>
-                  <div className="space-y-4">
-                    {viewingEntry.log.journalEntries.map(entry => (
-                      <div key={entry.id} className="bg-white/5 rounded-2xl p-4">
-                        <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                          <Clock size={12} />
-                          <span>{entry.timestamp}</span>
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap">{entry.text}</p>
-                        {entry.photos && entry.photos.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {entry.photos.map((photo, i) => (
-                              <img 
-                                key={i} 
-                                src={photo} 
-                                alt="" 
-                                className="w-24 h-24 object-cover rounded-xl cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => setExpandedImage(photo)}
-                              />
-                            ))}
-                          </div>
-                        )}
+                <div className="flex justify-center gap-4 mt-6">
+                  {viewingEntry.log.moods.map(moodId => {
+                    const mood = state.moods.find(m => m.id === moodId);
+                    return mood && (
+                      <div key={moodId} className="flex flex-col items-center gap-1">
+                        <span className="text-4xl">{mood.emoji}</span>
+                        <span className="text-xs text-gray-500">{mood.label}</span>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
+            </header>
 
-              {/* Tasks Summary */}
-              {(viewingEntry.log.tasks?.length || 0) > 0 && (
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-3">Tasks</h3>
-                  <div className="bg-white/5 rounded-2xl p-4">
-                    <div className="text-sm">
-                      {viewingEntry.log.tasks?.filter(t => t.completed).length} of {viewingEntry.log.tasks?.length} completed
-                    </div>
-                  </div>
+            {/* Activities */}
+            {(viewingEntry.log.activities?.length || 0) > 0 && (
+              <section>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-3">Activities</p>
+                <div className="flex flex-wrap gap-2">
+                  {viewingEntry.log.activities?.map(actId => {
+                    const cat = state.categories.find(c => c.id === actId);
+                    return cat && (
+                      <span key={actId} className="px-3 py-1.5 rounded-full text-sm bg-white/5 text-gray-300">
+                        {cat.label}
+                      </span>
+                    );
+                  })}
                 </div>
-              )}
+              </section>
+            )}
 
-              {/* Expenses Summary */}
-              {viewingEntry.log.expenses.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-black uppercase tracking-[0.2em] text-gray-500 mb-3">Spending</h3>
-                  <div className="bg-white/5 rounded-2xl p-4">
-                    <div className="text-lg font-bold">
-                      ₱{viewingEntry.log.expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString()}
+            {/* Journal Entries */}
+            {viewingEntry.log.journalEntries.length > 0 && (
+              <section>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-4">Journal</p>
+                <div className="space-y-6">
+                  {viewingEntry.log.journalEntries.map(entry => (
+                    <div key={entry.id}>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                        <Clock size={12} />
+                        <span>{entry.timestamp}</span>
+                      </div>
+                      <p className="text-base leading-relaxed whitespace-pre-wrap text-gray-300">{entry.text}</p>
+                      {entry.photos && entry.photos.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          {entry.photos.map((photo, i) => (
+                            <img 
+                              key={i} 
+                              src={photo} 
+                              alt="" 
+                              className="w-32 h-32 object-cover rounded-xl cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => setExpandedImage(photo)}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-xs text-gray-500">{viewingEntry.log.expenses.length} transactions</div>
-                  </div>
+                  ))}
                 </div>
-              )}
-            </div>
+              </section>
+            )}
+
+            {/* Tasks & Expenses Summary */}
+            {((viewingEntry.log.tasks?.length || 0) > 0 || viewingEntry.log.expenses.length > 0) && (
+              <section className="pt-6 border-t border-white/5">
+                <div className="grid grid-cols-2 gap-4">
+                  {(viewingEntry.log.tasks?.length || 0) > 0 && (
+                    <div className="bg-white/[0.02] rounded-xl p-4">
+                      <p className="text-xs text-gray-500 mb-1">Tasks</p>
+                      <p className="text-lg font-medium">
+                        {viewingEntry.log.tasks?.filter(t => t.completed).length}/{viewingEntry.log.tasks?.length}
+                      </p>
+                      <p className="text-xs text-gray-500">completed</p>
+                    </div>
+                  )}
+                  {viewingEntry.log.expenses.length > 0 && (
+                    <div className="bg-white/[0.02] rounded-xl p-4">
+                      <p className="text-xs text-gray-500 mb-1">Spending</p>
+                      <p className="text-lg font-medium">
+                        P{viewingEntry.log.expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-gray-500">{viewingEntry.log.expenses.length} transactions</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
           </div>
         </div>
       )}
@@ -407,19 +361,19 @@ const Timeline: React.FC<TimelineProps> = ({ state }) => {
       {/* Fullscreen Image Viewer */}
       {expandedImage && (
         <div 
-          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4"
+          className="fixed inset-0 z-[100] bg-black flex items-center justify-center p-4"
           onClick={() => setExpandedImage(null)}
         >
           <button 
             onClick={() => setExpandedImage(null)}
-            className="absolute top-6 right-6 p-4 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-50"
+            className="absolute top-6 right-6 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
           >
-            <X size={24} />
+            <X size={20} />
           </button>
           <img 
             src={expandedImage} 
             alt="Full screen" 
-            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            className="max-w-full max-h-[90vh] object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
